@@ -57,6 +57,22 @@ define Build/trx
 		-a 4 -f $(IMAGE_ROOTFS)
 endef
 
+define Build/loader-common
+	rm -rf $@.src
+	$(MAKE) -C lzma-loader \
+		PKG_BUILD_DIR="$@.src" \
+		TARGET_DIR="$(dir $@)" LOADER_NAME="$(notdir $@)" \
+		BOARD="$(BOARDNAME)" PLATFORM="$(PLATFORM)" \
+		LZMA_TEXT_START=0x82000000 LOADADDR=$(KERNEL_LOADADDR) \
+		$(1) compile loader.$(LOADER_TYPE)
+	mv "$@.$(LOADER_TYPE)" "$@"
+	rm -rf $@.src
+endef
+
+define Build/loader-kernel
+	$(call Build/loader-common,LOADER_DATA="$@")
+endef
+
 define Build/relocate-kernel
 	( \
 		dd if=$(KDIR)/loader.bin bs=32 conv=sync && \
@@ -92,11 +108,6 @@ define Build/poray-header
 	mv $@.new $@
 endef
 
-define Build/senao-header
-	$(STAGING_DIR_HOST)/bin/mksenaofw $(1) -e $@ -o $@.new
-	mv $@.new $@
-endef
-
 define Build/seama
 	$(STAGING_DIR_HOST)/bin/seama -i $@ $(1)
 	mv $@.seama $@
@@ -109,6 +120,30 @@ endef
 define Build/wrg-header
 	mkwrgimg -i $@ -d "/dev/mtdblock/2" -s $(1) -o $@.new
 	mv $@.new $@
+endef
+
+# combine kernel and rootfs into one image
+# mkdlinkfw <type> <optional extra arguments to mkdlinkfw binary>
+
+define Build/mkdlinkfw
+	-$(STAGING_DIR_HOST)/bin/mkdlinkfw \
+		-k $(IMAGE_KERNEL) \
+		-r $(IMAGE_ROOTFS) \
+		-o $@ \
+		-s $(DLINK_FIRMWARE_SIZE)
+endef
+
+define Build/mkdlinkfw-factory
+	-$(STAGING_DIR_HOST)/bin/mkdlinkfw \
+		-m $(DLINK_ROM_ID) -f $(DLINK_FAMILY_MEMBER) \
+		-F $@ \
+		-o $@.new \
+		-s $(DLINK_FIRMWARE_SIZE)
+	mv $@.new $@
+endef
+
+define Build/zyimage
+	$(STAGING_DIR_HOST)/bin/zyimage $(1) $@
 endef
 
 #

@@ -44,6 +44,8 @@ proto_qmi_setup() {
 		return 1
 	}
 
+	[ -n "$delay" ] && sleep "$delay"
+
 	device="$(readlink -f $device)"
 	[ -c "$device" ] || {
 		echo "The specified control device does not exist"
@@ -61,8 +63,6 @@ proto_qmi_setup() {
 		proto_set_available "$interface" 0
 		return 1
 	}
-
-	[ -n "$delay" ] && sleep "$delay"
 
 	while uqmi -s -d "$device" --get-pin-status | grep '"UIM uninitialized"' > /dev/null; do
 		[ -e "$device" ] || return 1
@@ -279,10 +279,15 @@ qmi_wds_stop() {
 
 	uqmi -s -d "$device" --set-client-id wds,"$cid" \
 		--stop-network 0xffffffff \
-		--autoconnect > /dev/null
+		--autoconnect > /dev/null 2>&1
 
-	[ -n "$pdh" ] && uqmi -s -d "$device" --set-client-id wds,"$cid" --stop-network "$pdh"
-	uqmi -s -d "$device" --set-client-id wds,"$cid" --release-client-id wds
+	[ -n "$pdh" ] && {
+		uqmi -s -d "$device" --set-client-id wds,"$cid" \
+			--stop-network "$pdh" > /dev/null 2>&1
+	}
+
+	uqmi -s -d "$device" --set-client-id wds,"$cid" \
+		--release-client-id wds > /dev/null 2>&1
 }
 
 proto_qmi_teardown() {
